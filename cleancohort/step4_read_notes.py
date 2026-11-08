@@ -80,12 +80,13 @@ def extract_with_rules(note_text: str):
 def make_anthropic_caller(model: str | None = None):
     import anthropic
     client = anthropic.Anthropic()
-    model = model or os.environ.get("CLEANCOHORT_LLM_MODEL", "claude-sonnet-4-5")
+    model = model or os.environ.get("CLEANCOHORT_LLM_MODEL", "claude-sonnet-5-5")
 
     def call(prompt: str) -> str:
-        msg = client.messages.create(model=model, max_tokens=800,
+        msg = client.messages.create(model=model, max_tokens=2000,
+                                     output_config={"effort": "low"},
                                      messages=[{"role": "user", "content": prompt}])
-        return msg.content[0].text
+        return "".join(b.text for b in msg.content if b.type == "text")
     return call
 
 
@@ -161,5 +162,10 @@ def read_all_notes(notes: pd.DataFrame, audit, method: str = "rules", call_llm=N
 #   Anything else is rejected and logged.
 # - Synonyms are searched longest-first so "type 2 diabetes" wins over shorter matches.
 # - LLM setup: pip install anthropic, set ANTHROPIC_API_KEY, optional CLEANCOHORT_LLM_MODEL.
+# - Model is claude-sonnet-5-5. Current models think before answering, so two things matter:
+#     * effort="low" keeps thinking short - this is simple extraction, not a hard problem
+#     * we join ALL text blocks instead of reading content[0], because block 0 can be a
+#       thinking block; reading it would return "" and reject every note as invalid JSON
+# - max_tokens is 2000 because thinking tokens share that budget with the JSON answer.
 # - The LLM path is tested with a fake LLM (tests/test_pipeline.py), not a real API call yet.
 # ---------------------------------------------------------------------------
