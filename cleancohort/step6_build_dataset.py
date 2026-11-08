@@ -48,8 +48,9 @@ def wearable_summary(measurements):
 def smoking_summary(observations, audit):
     smk = observations[observations["item"] == "smoking_status"]
     by_source = smk.groupby(["study_id", "source"])["value"].last().unstack()
-    notes = by_source.get("notes", pd.Series(dtype=object))
-    survey = by_source.get("survey", pd.Series(dtype=object))
+    empty = pd.Series(index=by_source.index, dtype=object)
+    notes = by_source.get("notes", empty)
+    survey = by_source.get("survey", empty)
     out = pd.DataFrame(index=by_source.index)
     out["smoking_status"] = notes.combine_first(survey)
     out["smoking_conflict"] = (notes.notna() & survey.notna() & (notes != survey)).astype(int)

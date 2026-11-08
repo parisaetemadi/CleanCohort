@@ -83,3 +83,15 @@ def test_full_pipeline_end_to_end(tmp_path, monkeypatch):
     assert with_notes > ehr_only
     assert v["summary"]["wearable_link_rate"] == 1.0
     assert (tmp_path / "data/secure/quality_report.html").exists()
+
+
+def test_pipeline_survives_llm_finding_no_smoking(tmp_path, monkeypatch):
+    """A reader that finds no smoking status anywhere must not crash step 6."""
+    monkeypatch.chdir(tmp_path)
+    make_fake_data(n_patients=40)
+    silent_llm = lambda prompt: '{"conditions": [], "smoking": null}'
+    result = run_pipeline(method="llm", call_llm=silent_llm, verbose=False)
+    data = result["dataset"]
+    assert len(data) == 40
+    assert data["smoking_conflict"].sum() == 0
+    assert data["smoking_status"].notna().any()
