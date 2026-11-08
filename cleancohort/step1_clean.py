@@ -171,7 +171,8 @@ def clean_wearables(daily: pd.DataFrame, links: pd.DataFrame, audit):
             "resting_hr": check_range(r["resting_hr"], "resting_hr", audit, "wearable", rec),
             "sleep_hours": check_range(r["sleep_hours"], "sleep_hours", audit, "wearable", rec),
         })
-    return pd.DataFrame(rows), links.reset_index(drop=True)
+    cols = ["device_id", "date", "steps", "resting_hr", "sleep_hours"]
+    return pd.DataFrame(rows, columns=cols), links.reset_index(drop=True)
 
 
 def parse_health_word(value):
@@ -215,7 +216,8 @@ def clean_surveys(raw: pd.DataFrame, audit) -> pd.DataFrame:
             "smoking_status": smoke,
             "activity_days": days,
         })
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["survey_id", "name", "dob", "self_rated_health",
+                                       "smoking_status", "activity_days"])
 
 
 def clean_all(raw: dict, audit) -> dict:

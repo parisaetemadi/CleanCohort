@@ -116,3 +116,17 @@ def test_hybrid_only_pays_for_notes_rules_cannot_read(tmp_path, monkeypatch):
     h = hybrid["validation"]["conditions"].query("method == 'EHR + notes'")["sensitivity"]
     r = rules["validation"]["conditions"].query("method == 'EHR + notes'")["sensitivity"]
     assert h.mean() >= r.mean()
+
+
+def test_mapper_finds_condition_inside_real_diagnosis_text():
+    """Real EHR text wraps the condition name; whole-string matching missed all of it."""
+    assert map_term("Childhood asthma")[0] == "asthma"
+    assert map_term("Pulmonary emphysema (disorder)")[0] == "copd"
+    assert map_term("Major depression disorder")[0] == "depression"
+
+
+def test_mapper_refuses_clinical_lookalikes():
+    """Substring matching must not miscode a different disease that shares the word."""
+    for term in ["Pulmonary hypertension", "Ocular hypertension", "Diabetes insipidus",
+                 "Gestational diabetes", "Pre-diabetes", "Family history of diabetes"]:
+        assert map_term(term)[0] is None, term

@@ -1,13 +1,28 @@
 """Step 5 - Map to standard codes and reshape into long tables (OMOP-style)."""
 
+import re
 from difflib import get_close_matches
 
 import pandas as pd
 
-from .vocab import CONDITIONS, MEASURES, OBSERVATIONS, SYNONYM_TO_CONCEPT
+from .vocab import CONDITIONS, LOOKALIKES, MEASURES, OBSERVATIONS, SYNONYM_TO_CONCEPT
 
 STEP = "5_map_codes"
 FUZZY_CUTOFF = 0.85
+
+_BY_LENGTH = sorted(SYNONYM_TO_CONCEPT, key=len, reverse=True)
+
+
+def contains_synonym(t: str):
+    """Real diagnosis text wraps the condition name ("Childhood asthma"). Find it as a
+    whole word, longest synonym first, and refuse known lookalike diseases."""
+    for syn in _BY_LENGTH:
+        if re.search(rf"\b{re.escape(syn)}\b", t):
+            concept = SYNONYM_TO_CONCEPT[syn]
+            if any(bad in t for bad in LOOKALIKES.get(concept, [])):
+                return None, None
+            return concept, syn
+    return None, None
 
 
 def map_term(term: str):
@@ -16,6 +31,9 @@ def map_term(term: str):
         return None, "empty"
     if t in SYNONYM_TO_CONCEPT:
         return SYNONYM_TO_CONCEPT[t], "exact"
+    concept, syn = contains_synonym(t)
+    if concept:
+        return concept, f"contains ('{syn}')"
     close = get_close_matches(t, SYNONYM_TO_CONCEPT.keys(), n=1, cutoff=FUZZY_CUTOFF)
     if close:
         return SYNONYM_TO_CONCEPT[close[0]], f"fuzzy (~'{close[0]}')"
@@ -67,7 +85,8 @@ def build_measurements(ehr: pd.DataFrame, wearable: pd.DataFrame) -> pd.DataFram
                     rows.append({"study_id": r["study_id"], "date": r[date_col], "measure": m,
                                  "loinc": MEASURES[m]["loinc"], "label": MEASURES[m]["label"],
                                  "value": float(r[m]), "unit": MEASURES[m]["unit"], "source": source})
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=["study_id", "date", "measure", "loinc", "label",
+                                       "value", "unit", "source"])
 
 
 def build_observations(survey: pd.DataFrame, note_smoking: pd.DataFrame) -> pd.DataFrame:
@@ -86,10 +105,18 @@ def build_observations(survey: pd.DataFrame, note_smoking: pd.DataFrame) -> pd.D
 
 # ---------------------------------------------------------------------------
 # KEY POINTS
-# - Matching a written diagnosis to a code, in 3 tiers:
-#     1. EXACT  - in the synonym list            -> accept
-#     2. FUZZY  - very close to one (a typo like "Hypertensn") -> accept, flag for review
-#     3. NONE   - no good match                  -> "unmapped", a human decides
+# - Matching a written diagnosis to a code, in 4 tiers:
+#     1. EXACT     - the whole term is in the synonym list    -> accept
+#     2. CONTAINS  - a synonym appears as a whole word inside -> accept
+#     3. FUZZY     - very close to one (typo "Hypertensn")    -> accept, flag for review
+#     4. NONE      - no good match -> "unmapped", a human decides
+# - CONTAINS exists because real EHR text wraps the condition name: Synthea writes
+#   "Childhood asthma" and "Pulmonary emphysema (disorder)". Exact matching alone found
+#   0 asthma and 0 COPD cases in 300 real patients; adding this tier found 7 and 4.
+# - CONTAINS is checked longest-synonym-first, so "type 2 diabetes" wins over "diabetes".
+# - The risk of CONTAINS is miscoding a different disease that shares a word, so every
+#   concept has a LOOKALIKES list in vocab.py: "Pulmonary hypertension" is NOT I10,
+#   "Diabetes insipidus" is NOT type 2 diabetes. Those are refused, not mapped.
 # - FUZZY_CUTOFF = 0.85 (0-1). Lower catches more typos but risks wrong matches.
 # - Only AFFIRMED note mentions become conditions.
 # - Data is reshaped into LONG tables (one row per fact), like the OMOP standard that

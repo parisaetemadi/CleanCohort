@@ -33,6 +33,21 @@ SYNONYM_TO_CONCEPT = {
     syn: concept for concept, info in CONDITIONS.items() for syn in info["synonyms"]
 }
 
+# Phrases that CONTAIN a condition name but are a different disease. Checked before
+# substring matching, so "Diabetes insipidus" never gets coded as type 2 diabetes and
+# "Pulmonary hypertension" never gets coded as essential hypertension (I10).
+LOOKALIKES = {
+    "type2_diabetes": ["diabetes insipidus", "gestational diabetes", "type 1 diabetes",
+                       "type i diabetes", "pre-diabetes", "prediabetes",
+                       "family history of diabetes"],
+    "hypertension": ["pulmonary hypertension", "ocular hypertension", "portal hypertension",
+                     "intracranial hypertension", "gestational hypertension",
+                     "pregnancy-induced hypertension", "family history of hypertension"],
+    "asthma": [],
+    "copd": [],
+    "depression": ["family history of depression"],
+}
+
 MEASURES = {
     "weight_kg":    {"loinc": "29463-7", "label": "Body weight",              "unit": "kg"},
     "glucose_mmol": {"loinc": "14749-6", "label": "Glucose, serum/plasma",    "unit": "mmol/L"},

@@ -21,16 +21,22 @@ def condition_flags(person, conditions):
     return out
 
 
+def measure_col(table, name):
+    """A measure absent from the whole dataset leaves no column - return an empty one."""
+    s = table.get(name)
+    return pd.Series(index=table.index, dtype=float) if s is None else s
+
+
 def ehr_summary(measurements):
     ehr = measurements[measurements["source"] == "ehr"].sort_values("date")
     latest = ehr.groupby(["study_id", "measure"])["value"].last().unstack()
     mean = ehr.groupby(["study_id", "measure"])["value"].mean().unstack()
     visits = ehr.groupby("study_id")["date"].nunique().rename("n_visits")
     return pd.DataFrame({
-        "weight_kg_latest": latest.get("weight_kg"),
-        "glucose_mmol_latest": latest.get("glucose_mmol"),
-        "sbp_mean": mean.get("sbp").round(1),
-        "dbp_mean": mean.get("dbp").round(1),
+        "weight_kg_latest": measure_col(latest, "weight_kg"),
+        "glucose_mmol_latest": measure_col(latest, "glucose_mmol"),
+        "sbp_mean": measure_col(mean, "sbp").round(1),
+        "dbp_mean": measure_col(mean, "dbp").round(1),
     }).join(visits)
 
 
@@ -39,9 +45,9 @@ def wearable_summary(measurements):
     mean = w.groupby(["study_id", "measure"])["value"].mean().unstack()
     days = w.groupby("study_id")["date"].nunique().rename("wearable_days")
     return pd.DataFrame({
-        "steps_mean": mean.get("steps").round(0),
-        "resting_hr_mean": mean.get("resting_hr").round(1),
-        "sleep_hours_mean": mean.get("sleep_hours").round(1),
+        "steps_mean": measure_col(mean, "steps").round(0),
+        "resting_hr_mean": measure_col(mean, "resting_hr").round(1),
+        "sleep_hours_mean": measure_col(mean, "sleep_hours").round(1),
     }).join(days)
 
 

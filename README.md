@@ -56,6 +56,22 @@ Compare the two readers head to head, including measured cost per note:
 python compare_rules_vs_llm.py
 ```
 
+## Run it on real data (Synthea)
+
+```bash
+curl -L -o synthea.zip https://synthetichealth.github.io/synthea-sample-data/downloads/synthea_sample_data_csv_apr2020.zip
+unzip -q synthea.zip -d data/external/synthea
+python run_synthea.py
+```
+
+[Synthea](https://synthetichealth.github.io/synthea/) is free synthetic patient data using
+real code systems (SNOMED conditions, LOINC measurements). Nobody wrote it to match our
+vocabulary, so unlike the bundled fake data it can actually catch mistakes — and it did.
+Exact-string matching found **0** asthma and **0** COPD cases in 300 real patients, because
+real records say `Childhood asthma`, not `asthma`. See `step5` KEY POINTS.
+
+Synthea has no clinical notes, so there is nothing for an AI to read and nothing to pay for.
+
 ## Files
 
 | File | What it does |
