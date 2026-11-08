@@ -14,14 +14,11 @@ _BY_LENGTH = sorted(SYNONYM_TO_CONCEPT, key=len, reverse=True)
 
 
 def contains_synonym(t: str):
-    """Real diagnosis text wraps the condition name ("Childhood asthma"). Find it as a
-    whole word, longest synonym first, and refuse known lookalike diseases."""
+    """Real diagnosis text wraps the condition name ("Childhood asthma"). Find a synonym
+    as a whole word, longest first so "type 2 diabetes" beats "diabetes"."""
     for syn in _BY_LENGTH:
         if re.search(rf"\b{re.escape(syn)}\b", t):
-            concept = SYNONYM_TO_CONCEPT[syn]
-            if any(bad in t for bad in LOOKALIKES.get(concept, [])):
-                return None, None
-            return concept, syn
+            return SYNONYM_TO_CONCEPT[syn], syn
     return None, None
 
 
@@ -29,15 +26,22 @@ def map_term(term: str):
     t = " ".join(term.strip().lower().split())
     if not t:
         return None, "empty"
+
+    concept, method = None, "unmapped"
     if t in SYNONYM_TO_CONCEPT:
-        return SYNONYM_TO_CONCEPT[t], "exact"
-    concept, syn = contains_synonym(t)
-    if concept:
-        return concept, f"contains ('{syn}')"
-    close = get_close_matches(t, SYNONYM_TO_CONCEPT.keys(), n=1, cutoff=FUZZY_CUTOFF)
-    if close:
-        return SYNONYM_TO_CONCEPT[close[0]], f"fuzzy (~'{close[0]}')"
-    return None, "unmapped"
+        concept, method = SYNONYM_TO_CONCEPT[t], "exact"
+    else:
+        found, syn = contains_synonym(t)
+        if found:
+            concept, method = found, f"contains ('{syn}')"
+        else:
+            close = get_close_matches(t, SYNONYM_TO_CONCEPT.keys(), n=1, cutoff=FUZZY_CUTOFF)
+            if close:
+                concept, method = SYNONYM_TO_CONCEPT[close[0]], f"fuzzy (~'{close[0]}')"
+
+    if concept and any(bad in t for bad in LOOKALIKES.get(concept, [])):
+        return None, "refused - lookalike disease"
+    return concept, method
 
 
 def build_conditions(ehr: pd.DataFrame, note_mentions: pd.DataFrame, audit):
@@ -117,6 +121,10 @@ def build_observations(survey: pd.DataFrame, note_smoking: pd.DataFrame) -> pd.D
 # - The risk of CONTAINS is miscoding a different disease that shares a word, so every
 #   concept has a LOOKALIKES list in vocab.py: "Pulmonary hypertension" is NOT I10,
 #   "Diabetes insipidus" is NOT type 2 diabetes. Those are refused, not mapped.
+# - The LOOKALIKES guard runs ONCE, after whichever tier found a concept - never inside a
+#   single tier. "Type 1 diabetes" is one character from "type 2 diabetes", so when the
+#   guard sat inside CONTAINS the FUZZY tier matched it as a typo and coded a type 1
+#   patient as type 2. Any new tier gets the guard for free; putting it inside one does not.
 # - FUZZY_CUTOFF = 0.85 (0-1). Lower catches more typos but risks wrong matches.
 # - Only AFFIRMED note mentions become conditions.
 # - Data is reshaped into LONG tables (one row per fact), like the OMOP standard that

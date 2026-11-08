@@ -128,5 +128,15 @@ def test_mapper_finds_condition_inside_real_diagnosis_text():
 def test_mapper_refuses_clinical_lookalikes():
     """Substring matching must not miscode a different disease that shares the word."""
     for term in ["Pulmonary hypertension", "Ocular hypertension", "Diabetes insipidus",
-                 "Gestational diabetes", "Pre-diabetes", "Family history of diabetes"]:
+                 "Gestational diabetes", "Pre-diabetes", "Prediabetes",
+                 "Family history of diabetes", "Diabetic renal disease (disorder)",
+                 "Type 1 diabetes", "Type I diabetes"]:
         assert map_term(term)[0] is None, term
+
+
+def test_bare_diabetes_maps_but_typo_tier_cannot_bypass_the_guard():
+    """"Type 1 diabetes" is one character from "type 2 diabetes", so the fuzzy tier will
+    match it. The lookalike guard must apply to every tier, not just substring matching."""
+    assert map_term("Diabetes")[0] == "type2_diabetes"
+    assert map_term("Type 1 diabetes")[0] is None
+    assert map_term("Hypertensn")[0] == "hypertension"

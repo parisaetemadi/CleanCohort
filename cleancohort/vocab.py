@@ -5,7 +5,7 @@ CONDITIONS = {
         "icd10": "E11",
         "label": "Type 2 diabetes mellitus",
         "synonyms": ["type 2 diabetes", "t2dm", "dm2", "diabetes mellitus type ii",
-                     "type ii diabetes", "sugar diabetes"],
+                     "type ii diabetes", "sugar diabetes", "diabetes"],
     },
     "hypertension": {
         "icd10": "I10",
