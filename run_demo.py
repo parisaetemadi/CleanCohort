@@ -10,12 +10,14 @@ from cleancohort.step0_make_fake_data import main as make_fake_data
 
 def main():
     parser = argparse.ArgumentParser(description="CleanCohort demo")
-    parser.add_argument("--use-llm", action="store_true", help="read notes with an AI model (needs ANTHROPIC_API_KEY)")
+    parser.add_argument("--use-llm", action="store_true", help="read EVERY note with an AI model (costs the most)")
+    parser.add_argument("--hybrid", action="store_true", help="rules first, AI only on notes rules can't read (cheapest AI option)")
     parser.add_argument("--patients", type=int, default=40)
     args = parser.parse_args()
 
+    method = "hybrid" if args.hybrid else ("llm" if args.use_llm else "rules")
     make_fake_data(n_patients=args.patients)
-    result = run_pipeline(method="llm" if args.use_llm else "rules")
+    result = run_pipeline(method=method)
 
     pd.set_option("display.width", 160, "display.max_columns", 12)
     print("\n=== What happened ===")

@@ -41,7 +41,7 @@ def run_pipeline(raw_dir="data/raw", out_dir="data/output", secure_dir="data/sec
     say("Step 3  de-identifying ...")
     deid = deidentify_all(linked, audit)
     say(f"Step 4  reading notes ({method}) ...")
-    if method == "llm" and call_llm is None:
+    if method in ("llm", "hybrid") and call_llm is None:
         call_llm = make_anthropic_caller()
     mentions, note_smoking = read_all_notes(deid["notes"], audit, method=method, call_llm=call_llm)
     say("Step 5  mapping to standard codes ...")

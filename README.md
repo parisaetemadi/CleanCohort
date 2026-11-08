@@ -26,12 +26,34 @@ python -m pytest -q           # run the tests
 
 Then open `data/secure/quality_report.html` in your browser.
 
-Optional: read notes with an AI model instead of rules:
+## Reading notes: three options, three prices
+
+The pipeline runs **free and offline by default**. An AI model is optional, and when you do
+want one, the hybrid mode pays for it only where the rules fall short.
+
+| Mode | Command | API calls per 1,000 notes | Needs a key |
+|---|---|---|---|
+| Rules | `python run_demo.py` | 0 | no |
+| **Hybrid** | `python run_demo.py --hybrid` | only notes the rules can't read | only if some escalate |
+| Every note | `python run_demo.py --use-llm` | 1,000 | yes |
 
 ```bash
-pip install anthropic
-export ANTHROPIC_API_KEY=...       # your key
-python run_demo.py --use-llm
+pip install anthropic                  # only needed for --hybrid / --use-llm
+export ANTHROPIC_API_KEY=...           # from console.anthropic.com, billed per token
+python run_demo.py --hybrid
+```
+
+Hybrid logs every escalation to the audit trail, so you can always see what you paid for
+and why. On the bundled fake data it escalates **0 of 40 notes** and matches the rules
+exactly — but those notes are written from the same synonym list the rules search
+(`CONDITION_SPELLINGS` in `step0`), so that 0% is a fact about the test data, not a
+promise about real records. The default model is `claude-haiku-5-5`, the cheapest current
+model; override it with `CLEANCOHORT_LLM_MODEL`.
+
+Compare the two readers head to head, including measured cost per note:
+
+```bash
+python compare_rules_vs_llm.py
 ```
 
 ## Files

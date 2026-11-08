@@ -95,3 +95,24 @@ def test_pipeline_survives_llm_finding_no_smoking(tmp_path, monkeypatch):
     assert len(data) == 40
     assert data["smoking_conflict"].sum() == 0
     assert data["smoking_status"].notna().any()
+
+
+def test_hybrid_only_pays_for_notes_rules_cannot_read(tmp_path, monkeypatch):
+    """Hybrid must call the paid model only when the rules come up empty."""
+    monkeypatch.chdir(tmp_path)
+    make_fake_data(n_patients=40)
+    calls = []
+    def counting_llm(prompt):
+        calls.append(prompt)
+        return '{"conditions": [], "smoking": null}'
+
+    hybrid = run_pipeline(method="hybrid", call_llm=counting_llm, verbose=False)
+    rules = run_pipeline(method="rules", out_dir="data/o2", secure_dir="data/s2", verbose=False)
+
+    notes = pd.read_csv(tmp_path / "data/output/notes_deidentified.csv")
+    assert len(calls) < len(notes)
+    escalations = int(hybrid["audit"]["rule"].str.contains("escalated", na=False).sum())
+    assert escalations == len(calls)
+    h = hybrid["validation"]["conditions"].query("method == 'EHR + notes'")["sensitivity"]
+    r = rules["validation"]["conditions"].query("method == 'EHR + notes'")["sensitivity"]
+    assert h.mean() >= r.mean()

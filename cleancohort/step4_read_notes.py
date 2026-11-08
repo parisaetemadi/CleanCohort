@@ -78,11 +78,14 @@ def extract_with_rules(note_text: str):
 
 
 def make_anthropic_caller(model: str | None = None):
-    import anthropic
-    client = anthropic.Anthropic()
-    model = model or os.environ.get("CLEANCOHORT_LLM_MODEL", "claude-sonnet-5-5")
+    client = None
+    model = model or os.environ.get("CLEANCOHORT_LLM_MODEL", "claude-haiku-5-5")
 
     def call(prompt: str) -> str:
+        nonlocal client
+        if client is None:
+            import anthropic
+            client = anthropic.Anthropic()
         msg = client.messages.create(model=model, max_tokens=2000,
                                      output_config={"effort": "low"},
                                      messages=[{"role": "user", "content": prompt}])
@@ -124,20 +127,29 @@ def extract_with_llm(note_text: str, call_llm, audit=None, note_id=""):
 def read_all_notes(notes: pd.DataFrame, audit, method: str = "rules", call_llm=None):
     mention_rows, smoking_rows = [], []
     for _, n in notes.iterrows():
+        used = method
         if method == "llm":
             mentions, smoking = extract_with_llm(n["note_text"], call_llm, audit, n["note_id"])
+        elif method == "hybrid":
+            mentions, smoking = extract_with_rules(n["note_text"])
+            used = "rules"
+            if not mentions and not smoking:
+                audit.log(STEP, "notes", n["note_id"], "reader", "rules", "llm",
+                          "rules found nothing - escalated to the paid model")
+                mentions, smoking = extract_with_llm(n["note_text"], call_llm, audit, n["note_id"])
+                used = "llm"
         else:
             mentions, smoking = extract_with_rules(n["note_text"])
         for m in mentions:
             mention_rows.append({"study_id": n["study_id"], "note_id": n["note_id"],
-                                 "date": n["note_date"], "method": method, **m})
+                                 "date": n["note_date"], "method": used, **m})
             if m["status"] != "affirmed":
                 audit.log(STEP, "notes", n["note_id"], m["concept"], m["evidence"], "not counted",
                           f"mention is {m['status']} - not the patient's condition")
         if smoking:
             smoking_rows.append({"study_id": n["study_id"], "note_id": n["note_id"], "date": n["note_date"],
                                  "smoking_status": smoking["status"], "evidence": smoking["evidence"],
-                                 "method": method})
+                                 "method": used})
     mention_cols = ["study_id", "note_id", "date", "method", "concept", "evidence", "status", "sentence"]
     smoking_cols = ["study_id", "note_id", "date", "smoking_status", "evidence", "method"]
     return pd.DataFrame(mention_rows, columns=mention_cols), pd.DataFrame(smoking_rows, columns=smoking_cols)
@@ -154,6 +166,12 @@ def read_all_notes(notes: pd.DataFrame, audit, method: str = "rules", call_llm=N
 #   Counting all three would create false positives -> biased prevalence.
 # - Method A, RULES (default): synonym lists + negation/family words. Fast, free,
 #   predictable, offline. Misses wording that isn't in the lists.
+# - Method C, HYBRID (the cheap way to use AI): rules read every note for free; the paid
+#   model is called ONLY for notes where the rules found nothing at all. Every escalation
+#   is logged, so the audit trail shows exactly what you paid for and why.
+#   On the fake data this escalates 0 of 40 notes - but that is because the fake notes are
+#   written from this same synonym list (see step0 CONDITION_SPELLINGS), so treat 0% as a
+#   property of the test data, not a promise about real notes.
 # - Method B, LLM (optional): an AI reads the already de-identified note. It understands
 #   more wording but can make things up, so GUARDRAILS check every answer:
 #     * concept must be in our allowed list
@@ -162,7 +180,12 @@ def read_all_notes(notes: pd.DataFrame, audit, method: str = "rules", call_llm=N
 #   Anything else is rejected and logged.
 # - Synonyms are searched longest-first so "type 2 diabetes" wins over shorter matches.
 # - LLM setup: pip install anthropic, set ANTHROPIC_API_KEY, optional CLEANCOHORT_LLM_MODEL.
-# - Model is claude-sonnet-5-5. Current models think before answering, so two things matter:
+# - Default model is claude-haiku-5-5, the cheapest current model (~20x cheaper per token
+#   than Sonnet). The guardrails below re-check every answer anyway, so a smaller model
+#   costs accuracy far less here than it would in an unchecked pipeline.
+# - No prompt caching: the instruction block is only ~250 tokens, well under the minimum
+#   cacheable prefix, so a cache_control breakpoint would silently do nothing.
+# - Current models think before answering, so two things matter:
 #     * effort="low" keeps thinking short - this is simple extraction, not a hard problem
 #     * we join ALL text blocks instead of reading content[0], because block 0 can be a
 #       thinking block; reading it would return "" and reject every note as invalid JSON
