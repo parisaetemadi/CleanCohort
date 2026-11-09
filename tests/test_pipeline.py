@@ -129,9 +129,23 @@ def test_mapper_refuses_clinical_lookalikes():
     """Substring matching must not miscode a different disease that shares the word."""
     for term in ["Pulmonary hypertension", "Ocular hypertension", "Diabetes insipidus",
                  "Gestational diabetes", "Pre-diabetes", "Prediabetes",
-                 "Family history of diabetes", "Diabetic renal disease (disorder)",
+                 "Family history of diabetes", "Chronic venous hypertension",
+                 "Subcutaneous emphysema", "Drug-induced diabetes",
                  "Type 1 diabetes", "Type I diabetes"]:
         assert map_term(term)[0] is None, term
+
+
+def test_diabetes_complications_count_as_cases():
+    """A deliberate case-definition choice, not an accident.
+
+    "Diabetic retinopathy" and "Diabetic renal disease" are complications OF diabetes, so
+    a patient carrying one has the disease. Counting them widens the definition and is the
+    reason "diabetic" is a synonym; the type 1 and gestational forms are still refused, so
+    the widening does not pull in the other diabetes types."""
+    for term in ["Diabetic renal disease (disorder)", "Diabetic retinopathy",
+                 "Diabetic gastroparesis"]:
+        assert map_term(term)[0] == "type2_diabetes", term
+    assert map_term("Type 1 diabetic")[0] is None
 
 
 def test_bare_diabetes_maps_but_typo_tier_cannot_bypass_the_guard():

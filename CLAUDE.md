@@ -35,13 +35,25 @@ Order matters: link before de-identifying (needs names/DOB), and de-identify bef
 
 ## Status
 - Works end to end on 40 fake patients. EHR + notes sensitivity is 1.0 for all 5 conditions;
-  false positives are 0.
+  false positives are 0. Treat that as a ceiling, not a score: step0 writes the notes from
+  the same synonym list vocab.py searches, so the rules cannot miss.
+- Also runs on real-shaped data: `run_synthea.py` (300 Synthea patients, real SNOMED/LOINC)
+  and 4,966 real clinical notes from MTSamples, where mean recall is 0.93.
 - The LLM note reader has been tested only with a fake LLM; it still needs a real API run.
+  `--hybrid` calls it only for notes the rules cannot read, so the bill stays near zero.
+
+## Free data on disk (gitignored, see README for the download commands)
+- `data/external/mtsamples/` - 4,966 real clinical notes, CC0. The only open free text found.
+- `data/external/icd10cm/` - official FY2027 ICD-10-CM, 74,879 codes. Source of LOOKALIKES.
+- `data/external/synthea/` - ~1k synthetic patients with real code systems.
+- `data/external/mimic4demo/` - 100 real patients, structured only, no notes.
 
 ## Next steps (ideas, in rough order)
 1. Do the exercises in README.md together (learning).
 2. Run the LLM note reader for real and compare it with the rules (agreement table).
-3. Use real public data: Synthea (synthetic EHR), then MIMIC-IV (needs PhysioNet + CITI course).
+   MTSamples is the right test set: real text, and the rules already have a score on it.
+3. ~~Synthea~~ done. Next real data is MIMIC-IV-Note, which needs PhysioNet credentialing
+   plus the CITI course - worth starting early, the approval takes weeks.
 4. Output to the standard OMOP CDM format.
 5. Stronger de-identification (e.g., Microsoft Presidio) and a scale test (10k+ patients).
 6. A simple web demo for pitching (upload CSV → see report).

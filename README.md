@@ -72,6 +72,49 @@ real records say `Childhood asthma`, not `asthma`. See `step5` KEY POINTS.
 
 Synthea has no clinical notes, so there is nothing for an AI to read and nothing to pay for.
 
+## Free health data: what is actually open
+
+Searched for real data this pipeline could be tested and improved on. What matters for a
+tool that reads notes is **free text**, and that is the scarcest thing.
+
+| Source | Size | Licence / access | What it gives us |
+|---|---|---|---|
+| [MTSamples](https://huggingface.co/datasets/harishnair04/mtsamples) | 4,966 notes | CC0, no sign-up | **Real clinical free text** — the only open source of it found |
+| [ICD-10-CM FY2027](https://www.cms.gov/medicare/coding-billing/icd-10-codes) | 74,879 codes | Public, CMS | Official diagnosis wording, and the lookalikes |
+| [Synthea](https://synthetichealth.github.io/synthea/) | ~1k patients | Open | Structured EHR with real SNOMED/LOINC codes |
+| [MIMIC-IV demo](https://physionet.org/content/mimic-iv-demo/) | 100 patients | ODbL, no sign-up | Real labs and ICD codes — **no notes** |
+| MIMIC-IV-Note | ~330k notes | PhysioNet credentialing + CITI course | The real prize, gated |
+| n2c2 / i2b2 | task corpora | Harvard DBMI data use agreement | Annotated NLP benchmarks, gated |
+| SNOMED CT | full terminology | UMLS licence / member country | Gated; ICD-10-CM is the open substitute |
+
+Download what the pipeline uses:
+
+```bash
+mkdir -p data/external/mtsamples data/external/icd10cm
+curl -L -o data/external/mtsamples/mtsamples.csv \
+  https://huggingface.co/datasets/harishnair04/mtsamples/resolve/main/mtsamples.csv
+curl -L -o data/external/icd10cm/icd10cm-2027.zip \
+  https://www.cms.gov/files/zip/2027-code-descriptions-tabular-order.zip
+unzip -q data/external/icd10cm/icd10cm-2027.zip -d data/external/icd10cm
+```
+
+MTSamples are transcription samples rather than verified records, and they carry no answer
+key — so they measure whether the vocabulary matches how clinicians write, not whether a
+diagnosis is correct. That is still the question the fake data cannot answer.
+
+### What the real text changed
+
+| | Before | After |
+|---|---|---|
+| Mean recall on 4,966 real notes | 0.91 | **0.93** |
+| Type 2 diabetes recall | 0.86 | **0.97** |
+| Miscodings caught by the lookalike guard | 0 (step 4 had none) | **141** |
+
+Three bugs only real text could expose: `ST depression` and `respiratory depression` were
+being read as the mood disorder, and `subcutaneous emphysema` — air under the skin after
+trauma — as COPD. Step 5 had a lookalike guard; step 4 did not. Now both share one list,
+built by searching the official codebook rather than by guessing.
+
 ## Files
 
 | File | What it does |

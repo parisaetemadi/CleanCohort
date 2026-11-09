@@ -6,7 +6,7 @@ import re
 
 import pandas as pd
 
-from .vocab import CONDITIONS
+from .vocab import CONDITIONS, LOOKALIKES
 
 STEP = "4_read_notes"
 
@@ -57,6 +57,20 @@ def mention_status(sentence: str) -> str:
     return "affirmed"
 
 
+def part_of_lookalike(sentence: str, start: int, end: int, concept: str) -> bool:
+    """True when the matched word is inside the name of a different disease.
+
+    "ST depression" is a heart tracing and "subcutaneous emphysema" is air under the skin.
+    Both contain a word we search for, so the match is only rejected when a lookalike
+    phrase actually covers it - a sentence that mentions both still keeps the real one."""
+    low = sentence.lower()
+    for bad in LOOKALIKES.get(concept, []):
+        for hit in re.finditer(re.escape(bad), low):
+            if hit.start() <= start and hit.end() >= end:
+                return True
+    return False
+
+
 def extract_with_rules(note_text: str):
     mentions = []
     for sentence in split_sentences(note_text):
@@ -64,6 +78,8 @@ def extract_with_rules(note_text: str):
         for concept, _, pattern in _PATTERNS:
             m = pattern.search(sentence)
             if m and concept not in found:
+                if part_of_lookalike(sentence, m.start(), m.end(), concept):
+                    continue
                 found.add(concept)
                 mentions.append({"concept": concept, "evidence": m.group(0),
                                  "status": mention_status(sentence), "sentence": sentence})
@@ -179,6 +195,13 @@ def read_all_notes(notes: pd.DataFrame, audit, method: str = "rules", call_llm=N
 #     * evidence must be copied word-for-word from the note
 #   Anything else is rejected and logged.
 # - Synonyms are searched longest-first so "type 2 diabetes" wins over shorter matches.
+# - part_of_lookalike is the precision half of the reader, and it was missing: step 5 had
+#   the LOOKALIKES guard but step 4 did not, so until now the rules read "ST depression"
+#   (9 real notes) and "respiratory depression" (8) as depression, and "subcutaneous
+#   emphysema" (5) as COPD. Measured on 4,966 MTSamples notes, the guard now rejects 141
+#   such matches.
+# - It rejects a match only when a lookalike phrase COVERS it, not merely appears in the
+#   same sentence, so "History of depression; ECG showed ST depression." still counts once.
 # - LLM setup: pip install anthropic, set ANTHROPIC_API_KEY, optional CLEANCOHORT_LLM_MODEL.
 # - Default model is claude-haiku-5-5, the cheapest current model (~20x cheaper per token
 #   than Sonnet). The guardrails below re-check every answer anyway, so a smaller model
