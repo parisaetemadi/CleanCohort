@@ -7,9 +7,13 @@
 - Don't ask permission before web searches; just search.
 
 ## Code style rules
-- **No comments on each line of code.** Keep the code clean.
-- Put a `KEY POINTS` bullet list at the **end of each file** explaining what it does and why
-  (see any `cleancohort/step*.py` for the format). Update it whenever the file changes.
+- **Never comment line by line, or chunk by chunk.** Do not narrate the code as you write
+  it. A comment inside the code earns its place only where the code cannot say the thing
+  itself: a non-obvious reason, a trap, a decision someone would otherwise undo.
+- **Instead, every file ends with a `KEY POINTS` bullet list** describing what the code in
+  that file does and why (see any `cleancohort/step*.py` for the format). This is where the
+  explaining goes. Update it whenever the file changes.
+- This applies to every file, not just Python: scripts, tests and config too.
 - Simple pandas, one small function per job, readable names. Avoid clever abstractions.
 - Every change to data must go through `AuditLog` (`cleancohort/audit.py`).
 
