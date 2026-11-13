@@ -131,7 +131,13 @@ def part_of_lookalike(sentence: str, start: int, end: int, concept: str) -> bool
     Both contain a word we search for, so the match is only rejected when a lookalike
     phrase actually covers it - a sentence that mentions both still keeps the real one."""
     low = sentence.lower()
+    matched = low[start:end]
     for bad in LOOKALIKES.get(concept, []):
+        # A lookalike that sits INSIDE the matched term is not a lookalike at all:
+        # "non-insulin-dependent diabetes mellitus" contains "insulin-dependent diabetes
+        # mellitus" and means the opposite of it.
+        if bad in matched:
+            continue
         for hit in re.finditer(re.escape(bad), low):
             if hit.start() <= start and hit.end() >= end:
                 return True

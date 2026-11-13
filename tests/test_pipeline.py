@@ -180,3 +180,17 @@ def test_negation_trigger_is_reported_for_the_audit_log():
     s = "The patient does not have asthma."
     assert negation_trigger(s, s.find("asthma"), s.find("asthma") + 6) == "does not"
     assert negation_trigger("He has asthma.", 7, 13) is None
+
+
+def test_a_lookalike_inside_the_matched_term_does_not_block_it():
+    """NIDDM is type 2 diabetes, and its full name contains the name of type 1's.
+
+    "non-insulin-dependent diabetes mellitus" holds "insulin-dependent diabetes mellitus"
+    as a substring while meaning the opposite, so a lookalike sitting inside the matched
+    term has to be ignored or the guard refuses the very thing it should accept."""
+    assert map_term("non-insulin-dependent diabetes mellitus")[0] == "type2_diabetes"
+    assert map_term("NIDDM")[0] == "type2_diabetes"
+    assert map_term("insulin-dependent diabetes mellitus")[0] is None
+    found = {m["concept"] for m in extract_with_rules(
+        "History of non-insulin-dependent diabetes mellitus.")[0]}
+    assert found == {"type2_diabetes"}

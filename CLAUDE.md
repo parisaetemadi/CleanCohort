@@ -57,6 +57,17 @@ Order matters: link before de-identifying (needs names/DOB), and de-identify bef
   step4 are written ourselves and merely scored against it.
 - `data/external/bioscope/` - negation + scope annotations, but the clinical half ships
   anonymised to `*` and needs the 2007 CMC corpus to reconstruct. Abstracts only, so far.
+- `data/external/bc5cdr/`, `data/external/ncbi_disease/` - 12,850 disease mentions
+  annotated by hand. Used to check the vocabulary against wording we did not choose.
+- `data/external/casi/` - 440 clinical abbreviations and their senses, from 604,944 real
+  dictated notes. Tells us which abbreviations are ambiguous before we adopt one.
+
+## Searched for and NOT usable (don't re-search these)
+- MIMIC-IV-Note, n2c2/i2b2, MIMIC-III-Ext-Notes: credentialing or a data use agreement.
+- SNOMED CT, OHDSI Athena: licence or registration. ICD-10-CM is the open substitute.
+- BioScope clinical half: anonymised to `*`, needs the 2007 CMC corpus.
+- CMS DE-SynPUF: free but ~60 GB over 159 files, and claims rather than notes. Worth it
+  only for a scale test of steps 1/5/6, not for note reading.
 
 ## Scores worth keeping straight
 - Fake data (`run_demo.py`): sensitivity 1.0 - a ceiling, not a score. Circular by design.
@@ -64,6 +75,8 @@ Order matters: link before de-identifying (needs names/DOB), and de-identify bef
   and 138 miscodings stopped by the lookalike guard.
 - Negation (`train_negation.py`): accuracy 0.985 on held-out labelled reports, which beat
   both NegEx's own 271 triggers and a trained classifier.
+- Annotated corpora (`eval_real_notes.py`, third section): 86% of hand-annotated disease
+  mentions map; all 19 that don't are deliberate refusals, not gaps.
 
 ## Next steps (ideas, in rough order)
 1. Do the exercises in README.md together (learning).

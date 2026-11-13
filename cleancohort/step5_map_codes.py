@@ -27,19 +27,20 @@ def map_term(term: str):
     if not t:
         return None, "empty"
 
-    concept, method = None, "unmapped"
+    concept, method, matched = None, "unmapped", ""
     if t in SYNONYM_TO_CONCEPT:
-        concept, method = SYNONYM_TO_CONCEPT[t], "exact"
+        concept, method, matched = SYNONYM_TO_CONCEPT[t], "exact", t
     else:
         found, syn = contains_synonym(t)
         if found:
-            concept, method = found, f"contains ('{syn}')"
+            concept, method, matched = found, f"contains ('{syn}')", syn
         else:
             close = get_close_matches(t, SYNONYM_TO_CONCEPT.keys(), n=1, cutoff=FUZZY_CUTOFF)
             if close:
-                concept, method = SYNONYM_TO_CONCEPT[close[0]], f"fuzzy (~'{close[0]}')"
+                concept, method, matched = SYNONYM_TO_CONCEPT[close[0]], f"fuzzy (~'{close[0]}')", close[0]
 
-    if concept and any(bad in t for bad in LOOKALIKES.get(concept, [])):
+    if concept and any(bad in t and bad not in matched
+                       for bad in LOOKALIKES.get(concept, [])):
         return None, "refused - lookalike disease"
     return concept, method
 

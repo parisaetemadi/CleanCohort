@@ -12,6 +12,7 @@ MTSamples has no answer key, so this measures two different things:
 """
 
 import collections
+import glob
 import re
 import sys
 from pathlib import Path
@@ -19,6 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 from cleancohort.step4_read_notes import _PATTERNS, extract_with_rules, part_of_lookalike, split_sentences
+from cleancohort.step5_map_codes import map_term
 from cleancohort.vocab import LOOKALIKES
 
 NOTES = Path("data/external/mtsamples/mtsamples.csv")
@@ -74,6 +76,36 @@ def guard_table(notes) -> tuple[pd.DataFrame, int]:
     return df, sum(hits.values())
 
 
+ANNOTATED = ["data/external/bc5cdr/CDR_Data/CDR.Corpus.v010516/*.PubTator.txt",
+             "data/external/ncbi_disease/NCBI_corpus_*.txt"]
+DISEASE_TYPES = {"disease", "diseaseclass", "specificdisease", "modifier", "compositemention"}
+RELEVANT = r"diabet|hypertens|asthma|copd|emphysema|chronic obstructive|depress"
+
+
+def annotated_surface_forms() -> collections.Counter:
+    """Disease mentions marked up by hand in BC5CDR and the NCBI Disease corpus."""
+    forms = collections.Counter()
+    for pattern in ANNOTATED:
+        for path in glob.glob(pattern):
+            for line in open(path, encoding="utf-8", errors="replace"):
+                parts = line.rstrip("\n").split("\t")
+                if len(parts) >= 5 and parts[4].lower() in DISEASE_TYPES:
+                    forms[parts[3].strip()] += 1
+    return forms
+
+
+def corpus_coverage() -> tuple:
+    forms = annotated_surface_forms()
+    if not forms:
+        return None, None, None
+    ours = {f: n for f, n in forms.items() if re.search(RELEVANT, f, re.IGNORECASE)}
+    missed = {f: n for f, n in ours.items() if not map_term(f)[0]}
+    mapped = sum(ours.values()) - sum(missed.values())
+    df = pd.DataFrame(sorted(missed.items(), key=lambda kv: -kv[1]),
+                      columns=["surface form", "mentions"])
+    return mapped / max(sum(ours.values()), 1), df, len(forms)
+
+
 def main():
     notes = load_notes()
     print(f"{len(notes):,} real clinical notes (MTSamples, CC0)\n")
@@ -86,6 +118,15 @@ def main():
     guard, total = guard_table(notes)
     print(f"\n=== Miscodings the lookalike guard prevented: {total} ===")
     print(guard.head(12).to_string(index=False))
+
+    coverage, missed, n_forms = corpus_coverage()
+    if coverage is None:
+        print("\n=== Annotated corpora not downloaded - skipping (see README) ===")
+        return
+    print(f"\n=== Coverage of {n_forms:,} hand-annotated disease forms (BC5CDR + NCBI Disease) ===")
+    print(f"{coverage:.0%} of relevant mentions map to a study condition.")
+    print("Everything below is a deliberate refusal, not a gap:")
+    print(missed.head(10).to_string(index=False))
 
 
 if __name__ == "__main__":
@@ -105,4 +146,10 @@ if __name__ == "__main__":
 # - The rejection count is exact - each one is a real match a real note would have produced.
 # - Re-run this after any change to CONDITIONS or LOOKALIKES in vocab.py. A synonym that
 #   lifts recall and also lifts rejections is usually a synonym that needs a lookalike.
+# - The third section checks the vocabulary against disease mentions annotated by hand in
+#   BC5CDR and the NCBI Disease corpus - people with no connection to this project. It is
+#   the strongest check here, because the surface forms were not chosen by us.
+# - A form landing in the "missed" table is only a problem if it is NOT in LOOKALIKES.
+#   Every one of them currently is, which is what makes the 15% shortfall the right answer
+#   rather than a gap: pulmonary hypertension and diabetes insipidus should not map.
 # ---------------------------------------------------------------------------

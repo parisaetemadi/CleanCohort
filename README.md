@@ -82,6 +82,8 @@ tool that reads notes is **free text**, and that is the scarcest thing.
 | [MTSamples](https://huggingface.co/datasets/harishnair04/mtsamples) | 4,966 notes | CC0, no sign-up | **Real clinical free text** — the only open source of it found |
 | [NegEx release](https://github.com/chapmanbe/negex) | 2,376 assertions | Open repo, no stated licence | **Labels** — affirmed/negated on 116 real discharge summaries |
 | [ICD-10-CM FY2027](https://www.cms.gov/medicare/coding-billing/icd-10-codes) | 74,879 codes | Public, CMS | Official diagnosis wording, and the lookalikes |
+| [BC5CDR + NCBI Disease](https://github.com/JHnlp/BioCreative-V-CDR-Corpus) | 12,850 mentions | Open | Disease mentions annotated by hand — an independent check on the vocabulary |
+| [CASI](https://conservancy.umn.edu/items/6651323b-444a-479e-a41a-abca58c2e721) | 440 abbreviations | UMN Conservancy | Which clinical abbreviations are ambiguous, from 604,944 real notes |
 | [BioScope](https://rgai.inf.u-szeged.hu/node/105) | 11,871 sentences | Free for research | Negation + scope, but its clinical half is anonymised to `*` |
 | [Synthea](https://synthetichealth.github.io/synthea/) | ~1k patients | Open | Structured EHR with real SNOMED/LOINC codes |
 | [MIMIC-IV demo](https://physionet.org/content/mimic-iv-demo/) | 100 patients | ODbL, no sign-up | Real labs and ICD codes — **no notes** |
@@ -146,6 +148,24 @@ Three things the old word list could not do:
 | Scope | `Denies chest pain but has asthma.` → asthma **affirmed** |
 | Pseudo-negation | `No change in his asthma.` → **affirmed**, not negated |
 | Post-negation | `Asthma was ruled out.` → **negated** |
+
+### The vocabulary, checked against strangers
+
+BC5CDR and the NCBI Disease corpus hold 12,850 disease mentions annotated by people with
+no connection to this project — the strongest available check, because they chose the
+wording. **86% of the relevant mentions map to a study condition**, and every one of the
+19 that does not is a deliberate refusal: pulmonary hypertension, diabetes insipidus,
+respiratory depression. None is a gap.
+
+That check found a real bug. `non-insulin-dependent diabetes mellitus` — which *is* type 2
+diabetes — was being refused, because the lookalike `insulin-dependent diabetes mellitus`
+is a substring of it. A lookalike sitting inside the matched term is now ignored, in both
+the note reader and the code mapper.
+
+CASI answers a different question: of our abbreviations, only `COPD` appears among the 440
+most ambiguous in real notes, and its 14 senses all turn out to be long forms of the same
+disease. One is a trap — `COLD` is used for chronic obstructive lung disease, and is
+deliberately **not** a synonym here.
 
 ## Files
 
