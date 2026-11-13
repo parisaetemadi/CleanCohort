@@ -10,7 +10,47 @@ from .vocab import CONDITIONS, LOOKALIKES
 
 STEP = "4_read_notes"
 
-NEGATION_WORDS = ["denies", "denied", "no ", "negative for", "without", "ruled out", "no history of"]
+# Negation is read the way the published NegEx algorithm reads it (Chapman 2001): a
+# trigger negates only what is NEAR it and on the right side of it, pseudo-negations are
+# taken out of the running first, and a conjunction ends the trigger's reach. The word
+# lists below are our own, written from the phrasing in real discharge summaries and
+# scored on 1,945 hand-labelled assertions; train_negation.py is that measurement.
+
+# Look like negations, are not. Removed before anything else is considered.
+PSEUDO_NEGATION = [
+    "no increase", "no change", "no significant change", "no interval change",
+    "no suspicious change", "not extend", "not cause", "not drain", "not only",
+    "gram negative", "gram-negative", "no further", "not necessarily", "not rule out",
+    "cannot be excluded", "cannot be ruled out", "not be ruled out",
+]
+
+# Negate what comes AFTER them.
+PRE_NEGATION = [
+    "denies", "denied", "denying", "declines", "declined", "no", "not", "never",
+    "without", "absent", "negative for", "no evidence of", "no evidence", "no sign of",
+    "no signs of", "no history of", "no complaints of", "no findings of", "free of",
+    "ruled out", "rule out", "rules out", "ruled out for", "unremarkable for",
+    "fails to reveal", "failed to reveal", "does not", "did not", "do not", "was not",
+    "were not", "is not", "are not", "has not", "have not", "had not", "cannot",
+    "resolved", "low suspicion for", "no suspicion of", "no suggestion of",
+    "not appear", "not demonstrate", "not reveal", "not believe", "not become",
+    "not complain of", "not have", "not had", "not known to", "with no", "without any",
+]
+
+# Negate what comes BEFORE them.
+POST_NEGATION = [
+    "was ruled out", "is ruled out", "were ruled out", "has been ruled out",
+    "was negative", "is negative", "were negative", "not seen", "unlikely",
+    "was excluded", "is excluded", "resolved",
+]
+
+# A trigger's reach stops here, so "no chest pain but has asthma" keeps the asthma.
+SCOPE_ENDS = [
+    "but", "however", "although", "though", "nevertheless", "nonetheless", "except",
+    "aside from", "apart from", "other than", "secondary to", "yet", "still",
+    "which", "causing", "cause of", "etiology", "source of",
+]
+
 FAMILY_WORDS = ["mother", "father", "sister", "brother", "family history", "fhx", "parent",
                 "grandmother", "grandfather"]
 
@@ -48,13 +88,40 @@ def split_sentences(text: str) -> list[str]:
     return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
 
 
-def mention_status(sentence: str) -> str:
+def negation_trigger(sentence: str, start: int = None, end: int = None):
+    """The phrase that negates the finding, or None. Returning the phrase, not just True,
+    is what lets the audit log say WHY a mention was dropped."""
+    # Punctuation becomes spaces so "ruled out." still matches "ruled out", and it is
+    # swapped character for character so the match offsets stay valid.
+    low = re.sub(r"[^\w\s]", " ", f" {sentence.lower()} ")
+    for phrase in PSEUDO_NEGATION:
+        low = low.replace(f" {phrase} ", " " * (len(phrase) + 2))
+
+    # Without a known position, treat the whole sentence as the thing being judged.
+    if start is None:
+        before, after = low, low
+    else:
+        at = len(f" {sentence[:start].lower()}")
+        before, after = low[:at], low[at + (end - start):]
+
+    for phrase in SCOPE_ENDS:
+        before = before.rsplit(f" {phrase} ", 1)[-1]
+        after = after.split(f" {phrase} ", 1)[0]
+
+    for phrase in sorted(PRE_NEGATION, key=len, reverse=True):
+        if f" {phrase} " in before:
+            return phrase
+    for phrase in sorted(POST_NEGATION, key=len, reverse=True):
+        if f" {phrase} " in after:
+            return phrase
+    return None
+
+
+def mention_status(sentence: str, start: int = None, end: int = None) -> str:
     s = " " + sentence.lower()
     if any(w in s for w in FAMILY_WORDS):
         return "family"
-    if any(" " + w in s for w in NEGATION_WORDS):
-        return "negated"
-    return "affirmed"
+    return "negated" if negation_trigger(sentence, start, end) else "affirmed"
 
 
 def part_of_lookalike(sentence: str, start: int, end: int, concept: str) -> bool:
@@ -82,7 +149,8 @@ def extract_with_rules(note_text: str):
                     continue
                 found.add(concept)
                 mentions.append({"concept": concept, "evidence": m.group(0),
-                                 "status": mention_status(sentence), "sentence": sentence})
+                                 "status": mention_status(sentence, m.start(), m.end()),
+                                 "sentence": sentence})
     smoking = None
     low = note_text.lower()
     for status, phrases in SMOKING_RULES:
@@ -175,6 +243,22 @@ def read_all_notes(notes: pd.DataFrame, audit, method: str = "rules", call_llm=N
 # KEY POINTS
 # - Notes hold facts the coded EHR often misses (see the validation table: sensitivity
 #   jumps when notes are added).
+# - Negation is now measured, not argued about. On 1,945 assertions labelled by hand on
+#   real discharge summaries (NegEx release), held out BY REPORT:
+#       seven hand-written words   accuracy 0.969  sensitivity 0.928  PPV 0.941
+#       these rules                accuracy 0.985  sensitivity 0.957  PPV 0.978
+#       NegEx's own 271 triggers   accuracy 0.981  sensitivity 0.949  PPV 0.970
+#       a trained classifier       accuracy 0.979  sensitivity 0.949  PPV 0.963
+#   Run train_negation.py to reproduce it. The classifier lost, which is the useful
+#   result: negation is regular enough that a good word list beats 1,360 training
+#   examples, and a word list can also say WHY it fired, which a model cannot.
+# - Three things the old word list could not do, each worth a test:
+#     scope      "Denies chest pain but has asthma."       -> asthma is affirmed
+#     pseudo     "No change in his asthma."                -> affirmed, not negated
+#     post       "Asthma was ruled out."                   -> negated
+# - A missed negation is the expensive error: it turns "denies chest pain" into a case and
+#   inflates prevalence. A false negation is the opposite - it deletes a real case - so
+#   both sensitivity and specificity are reported and neither is traded away quietly.
 # - The hard part is STATUS, not finding the word:
 #     "PMH significant for HTN."  -> affirmed (patient has it)
 #     "Denies HTN."               -> negated  (patient does not)

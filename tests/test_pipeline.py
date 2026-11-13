@@ -8,7 +8,8 @@ from cleancohort.step0_make_fake_data import main as make_fake_data
 from cleancohort.step1_clean import (parse_date, normalize_mrn, parse_weight_kg, parse_glucose_mmol,
                                     parse_smoking_answer, parse_health_word)
 from cleancohort.step3_deidentify import scrub_note
-from cleancohort.step4_read_notes import extract_with_rules, extract_with_llm
+from cleancohort.step4_read_notes import (extract_with_rules, extract_with_llm,
+                                          mention_status, negation_trigger)
 from cleancohort.step5_map_codes import map_term
 
 
@@ -154,3 +155,28 @@ def test_bare_diabetes_maps_but_typo_tier_cannot_bypass_the_guard():
     assert map_term("Diabetes")[0] == "type2_diabetes"
     assert map_term("Type 1 diabetes")[0] is None
     assert map_term("Hypertensn")[0] == "hypertension"
+
+
+def _status(sentence, term):
+    at = sentence.lower().find(term.lower())
+    return mention_status(sentence, at, at + len(term))
+
+
+def test_negation_respects_scope_and_pseudo_negations():
+    """The three things seven hand-written words could not do."""
+    # a conjunction ends the trigger's reach, so the second finding survives
+    assert _status("Denies chest pain but has asthma.", "asthma") == "affirmed"
+    # a pseudo-negation is not a negation
+    assert _status("No change in his asthma since last visit.", "asthma") == "affirmed"
+    # the trigger can follow the finding
+    assert _status("Asthma was ruled out.", "Asthma") == "negated"
+    # and the plain cases still work
+    assert _status("Denies asthma.", "asthma") == "negated"
+    assert _status("PMH significant for asthma.", "asthma") == "affirmed"
+
+
+def test_negation_trigger_is_reported_for_the_audit_log():
+    """A dropped mention has to be explainable, so the phrase itself comes back."""
+    s = "The patient does not have asthma."
+    assert negation_trigger(s, s.find("asthma"), s.find("asthma") + 6) == "does not"
+    assert negation_trigger("He has asthma.", 7, 13) is None

@@ -38,7 +38,7 @@ Order matters: link before de-identifying (needs names/DOB), and de-identify bef
   false positives are 0. Treat that as a ceiling, not a score: step0 writes the notes from
   the same synonym list vocab.py searches, so the rules cannot miss.
 - Also runs on real-shaped data: `run_synthea.py` (300 Synthea patients, real SNOMED/LOINC)
-  and 4,966 real clinical notes from MTSamples, where mean recall is 0.93.
+  and 4,966 real clinical notes from MTSamples, where the mean recall floor is 0.95.
 - The LLM note reader has been tested only with a fake LLM; it still needs a real API run.
   `--hybrid` calls it only for notes the rules cannot read, so the bill stays near zero.
 
@@ -47,6 +47,19 @@ Order matters: link before de-identifying (needs names/DOB), and de-identify bef
 - `data/external/icd10cm/` - official FY2027 ICD-10-CM, 74,879 codes. Source of LOOKALIKES.
 - `data/external/synthea/` - ~1k synthetic patients with real code systems.
 - `data/external/mimic4demo/` - 100 real patients, structured only, no notes.
+- `data/external/negex/` - 2,376 hand-labelled affirmed/negated assertions on 116 real
+  discharge summaries. The only LABELLED data in the project. Not vendored into the repo:
+  the source has no stated licence and says research use only, so our trigger lists in
+  step4 are written ourselves and merely scored against it.
+- `data/external/bioscope/` - negation + scope annotations, but the clinical half ships
+  anonymised to `*` and needs the 2007 CMC corpus to reconstruct. Abstracts only, so far.
+
+## Scores worth keeping straight
+- Fake data (`run_demo.py`): sensitivity 1.0 - a ceiling, not a score. Circular by design.
+- Real notes (`eval_real_notes.py`): mean recall floor 0.95 over 4,966 MTSamples notes,
+  and 138 miscodings stopped by the lookalike guard.
+- Negation (`train_negation.py`): accuracy 0.985 on held-out labelled reports, which beat
+  both NegEx's own 271 triggers and a trained classifier.
 
 ## Next steps (ideas, in rough order)
 1. Do the exercises in README.md together (learning).

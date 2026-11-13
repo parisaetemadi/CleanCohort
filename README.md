@@ -80,7 +80,9 @@ tool that reads notes is **free text**, and that is the scarcest thing.
 | Source | Size | Licence / access | What it gives us |
 |---|---|---|---|
 | [MTSamples](https://huggingface.co/datasets/harishnair04/mtsamples) | 4,966 notes | CC0, no sign-up | **Real clinical free text** — the only open source of it found |
+| [NegEx release](https://github.com/chapmanbe/negex) | 2,376 assertions | Open repo, no stated licence | **Labels** — affirmed/negated on 116 real discharge summaries |
 | [ICD-10-CM FY2027](https://www.cms.gov/medicare/coding-billing/icd-10-codes) | 74,879 codes | Public, CMS | Official diagnosis wording, and the lookalikes |
+| [BioScope](https://rgai.inf.u-szeged.hu/node/105) | 11,871 sentences | Free for research | Negation + scope, but its clinical half is anonymised to `*` |
 | [Synthea](https://synthetichealth.github.io/synthea/) | ~1k patients | Open | Structured EHR with real SNOMED/LOINC codes |
 | [MIMIC-IV demo](https://physionet.org/content/mimic-iv-demo/) | 100 patients | ODbL, no sign-up | Real labs and ICD codes — **no notes** |
 | MIMIC-IV-Note | ~330k notes | PhysioNet credentialing + CITI course | The real prize, gated |
@@ -114,6 +116,36 @@ Three bugs only real text could expose: `ST depression` and `respiratory depress
 being read as the mood disorder, and `subcutaneous emphysema` — air under the skin after
 trauma — as COPD. Step 5 had a lookalike guard; step 4 did not. Now both share one list,
 built by searching the official codebook rather than by guessing.
+
+### Negation, measured against labels
+
+Deciding whether a note says a patient **has** a condition or says they **do not** is what
+controls false positives, and it was seven hand-written words. The NegEx release ships
+2,376 assertions labelled by hand on real discharge summaries, so it can be scored.
+Held out **by report**, so no summary's wording appears on both sides:
+
+| Approach | Accuracy | Sensitivity | PPV |
+|---|---|---|---|
+| Seven hand-written words | 0.969 | 0.928 | 0.941 |
+| **These rules now** | **0.985** | **0.957** | **0.978** |
+| NegEx's own 271 triggers | 0.981 | 0.949 | 0.970 |
+| Trained classifier (TF-IDF + logistic regression) | 0.979 | 0.949 | 0.963 |
+
+```bash
+python train_negation.py     # reproduces the table
+```
+
+**The classifier lost**, and that is the useful result: negation is regular enough that a
+good word list beats 1,360 training examples — and a word list can say *which phrase*
+negated a finding, which the audit trail needs and a model cannot give.
+
+Three things the old word list could not do:
+
+| | |
+|---|---|
+| Scope | `Denies chest pain but has asthma.` → asthma **affirmed** |
+| Pseudo-negation | `No change in his asthma.` → **affirmed**, not negated |
+| Post-negation | `Asthma was ruled out.` → **negated** |
 
 ## Files
 
