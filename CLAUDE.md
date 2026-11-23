@@ -87,3 +87,11 @@ Order matters: link before de-identifying (needs names/DOB), and de-identify bef
 4. Output to the standard OMOP CDM format.
 5. Stronger de-identification (e.g., Microsoft Presidio) and a scale test (10k+ patients).
 6. A simple web demo for pitching (upload CSV → see report).
+
+## Working agreements (standing, don't re-confirm)
+- **Always merge.** Once CI is green, mark the PR ready for review and merge it.
+  Do not ask first — the answer is yes, every time.
+- **Never watch a PR.** Do not call `subscribe_pr_activity` after opening one.
+  No wake events, no polling, no safety-net check-ins. Each of those replays the
+  whole conversation and burns usage for nothing.
+- Batch related fixes into one branch and one PR rather than a PR per fix.
