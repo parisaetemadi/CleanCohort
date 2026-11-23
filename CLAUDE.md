@@ -89,9 +89,9 @@ Order matters: link before de-identifying (needs names/DOB), and de-identify bef
 6. A simple web demo for pitching (upload CSV → see report).
 
 ## Working agreements (standing, don't re-confirm)
-- **Always merge.** Once CI is green, mark the PR ready for review and merge it.
-  Do not ask first — the answer is yes, every time.
-- **Never watch a PR.** Do not call `subscribe_pr_activity` after opening one.
-  No wake events, no polling, no safety-net check-ins. Each of those replays the
-  whole conversation and burns usage for nothing.
-- Batch related fixes into one branch and one PR rather than a PR per fix.
+- **Read this file first**, before any other file in the repo.
+- **Always merge.** Once CI is green, mark the PR ready and merge it. Yes, every time.
+- **Never watch a PR.** Don't call `subscribe_pr_activity`; every wake event replays
+  the whole conversation and burns usage for nothing.
+- **One PR per session, not per fix.** Batch related work.
+- Run `python -m pytest -q` before pushing.
