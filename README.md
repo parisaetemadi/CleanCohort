@@ -1,6 +1,6 @@
 # CleanCohort
 
-> **Purpose.** Prototype: turn messy health data into one de-identified, study-ready dataset, with an audit log and a quality report.
+> **Purpose.** Turns messy health data into one clean, de-identified, study-ready dataset, with an audit log and a quality report.
 
 Turns messy health data (EHR records, doctor notes, wearables, surveys) into one clean, de-identified, **study-ready** dataset, with an audit log and a quality report.
 
