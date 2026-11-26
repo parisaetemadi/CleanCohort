@@ -1,5 +1,7 @@
 # CleanCohort
 
+> **Purpose.** Prototype: turn messy health data into one de-identified, study-ready dataset, with an audit log and a quality report.
+
 Turns messy health data (EHR records, doctor notes, wearables, surveys) into one clean, de-identified, **study-ready** dataset, with an audit log and a quality report.
 
 ```
@@ -220,3 +222,12 @@ Reading notes finds conditions the codes miss, and handling negation and family 
 - Small vocabularies; real products load full ICD-10, SNOMED and LOINC lists
 - Teaching-level de-identification; real use needs tested tools and a privacy review
 - The LLM path is tested with a fake LLM, not yet with a real API call
+
+## Agent rules
+
+- Commit straight to `main` and push — no branches, no PRs, no merges, never watch a PR.
+- One commit per session. Test it yourself before committing; don't report untested work.
+- Don't ask permission for deploys, settings, or deleting what's been replaced.
+- Save tokens: bullets over prose, read only the files named, targeted edits, batched tool calls.
+- Comments: one bullet list per file or section, never a comment per chunk of code.
+- Full detail: [CLAUDE.md](CLAUDE.md)
